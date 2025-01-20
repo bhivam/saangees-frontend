@@ -1,5 +1,6 @@
 import React, { createContext, useState, useEffect, ReactNode } from "react";
 import axios, { InternalAxiosRequestConfig } from "axios";
+import { baseUrl } from "../default";
 
 interface User {
   name: string;
@@ -44,7 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function login(username: string, password: string): Promise<void> {
     try {
       const response = await axios.post(
-        "http://localhost:3000/user/login",
+        baseUrl("/token"),
         { email: username, password },
         { withCredentials: true },
       );

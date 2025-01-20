@@ -1,5 +1,6 @@
 import axios from "axios";
 import { useEffect, useState } from "react";
+import { baseUrl } from "../default";
 
 export default function User() {
   const [user, setUser] = useState([]);
@@ -7,7 +8,7 @@ export default function User() {
   useEffect(() => {
     async function fetchUser() {
       try {
-        const response = await axios.get("http://localhost:3000/user");
+        const response = await axios.get(baseUrl("/user"));
         console.log(response.data);
         setUser(response.data);
       } catch (error) {
