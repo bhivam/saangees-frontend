@@ -8,15 +8,19 @@ interface ProtectedRouteProps {
 }
 
 function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, loading } = useAuth();
+
+  if (loading) {
+    return <div>Loading...</div>; // Display a loading indicator while authentication state is being determined
+  }
 
   if (!isAuthenticated) {
-    console.log("isAuthenticated is ", isAuthenticated)
+    console.log("User is not authenticated.");
     return <Navigate to="/auth" />;
   }
 
   if (requiredRole && !user?.is_admin) {
-    console.log(user)
+    console.log("User does not have the required admin role.", user);
     return <Navigate to="/unauthorized" />;
   }
 

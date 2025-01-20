@@ -1,18 +1,10 @@
-//  https://www.youtube.com/watch?v=X9WULjvgqTY&list=PLlameCF3cMEuXdBAqa4v8CsbjGnpic71H
-
-import React, {
-  createContext,
-  useState,
-  useLayoutEffect,
-  useCallback,
-  ReactNode,
-} from "react";
+import React, { createContext, useState, useEffect, ReactNode } from "react";
 import axios, { InternalAxiosRequestConfig } from "axios";
 
 interface User {
   name: string;
   email: string;
-  isAdmin: boolean;
+  is_admin: boolean;
 }
 
 interface AuthContextType {
@@ -20,164 +12,90 @@ interface AuthContextType {
   login(username: string, password: string): Promise<void>;
   logout(): void;
   user: User | null;
+  accessToken: string | null;
+  loading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [isAuthenticated, _setIsAuthenticated] = useState(false);
-  function setIsAuthenticated(value: boolean, location: string) {
-    console.log("SETTING isAuthenticated TO ", value, "FROM ", location);
-    _setIsAuthenticated(value);
-  }
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true); // Added loading state
 
-  function saveUserToLocalStorage(user: User): void {
-    localStorage.setItem("user", JSON.stringify(user));
+  function saveAuthData(token: string, user: User): void {
+    localStorage.setItem("authData", JSON.stringify({ token, user }));
   }
 
-  function getUserFromLocalStorage(): User | null {
-    const userData = localStorage.getItem("user");
-    return userData ? JSON.parse(userData) : null;
+  function loadAuthData(): { token: string; user: User } | null {
+    const data = localStorage.getItem("authData");
+    return data ? JSON.parse(data) : null;
   }
 
-  function clearUserData(): void {
-    localStorage.removeItem("user");
+  function clearAuthData(): void {
+    localStorage.removeItem("authData");
     setAccessToken(null);
     setUser(null);
-    setIsAuthenticated(false, "clearUserData");
+    setIsAuthenticated(false);
+    setLoading(false);
   }
 
   async function login(username: string, password: string): Promise<void> {
-    console.log(`Logging in as ${username}`);
-    console.log(`Logging in with password ${password}`);
-
     try {
       const response = await axios.post(
         "http://localhost:3000/user/login",
-        {
-          email: username,
-          password,
-        },
+        { email: username, password },
         { withCredentials: true },
       );
-      const { user, access_token: accessToken } = response.data;
+      const { token, user } = response.data;
 
-      setAccessToken(accessToken);
+      setAccessToken(token.token);
       setUser(user);
-      saveUserToLocalStorage(user);
-      setIsAuthenticated(true, "login");
+      setIsAuthenticated(true);
+      setLoading(false);
+      saveAuthData(token.token, user);
     } catch (error) {
       console.error("Login failed:", error);
+      setLoading(false);
       throw error;
     }
   }
 
   function logout(): void {
-    console.log("LOGGING OUT");
-    try {
-      axios.post("/user/logout");
-    } catch (error) {
-      console.warn("Failed to logout:", error);
-    } finally {
-      clearUserData();
-    }
+    clearAuthData();
   }
-  const refreshAccessToken = useCallback(async function (): Promise<string> {
-    try {
-      const response = await axios.get("http://localhost:3000/token/refresh", {
-        withCredentials: true,
-      });
-      setAccessToken(response.data.access_token);
-      setIsAuthenticated(true, "refreshAccessToken");
-      console.log("REFRESHED TOKEN:", response.data.access_token);
-      return response.data.access_token;
-    } catch (error) {
-      console.error("Token refresh failed:", error);
-      clearUserData();
-      throw error;
+
+  useEffect(() => {
+    const authData = loadAuthData();
+    if (authData) {
+      setAccessToken(authData.token);
+      setUser(authData.user);
+      setIsAuthenticated(true);
     }
+    setLoading(false); // Mark loading complete after checking auth data
   }, []);
 
-  interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
-    _retry?: boolean;
-  }
+  useEffect(() => {
+    const requestInterceptor = axios.interceptors.request.use(
+      (config: InternalAxiosRequestConfig) => {
+        if (accessToken) {
+          config.headers.Authorization = `Bearer ${accessToken}`;
+        }
+        return config;
+      },
+    );
 
-  useLayoutEffect(() => {
-    function registerInterceptors() {
-      const requestInterceptor = axios.interceptors.request.use(
-        (config: CustomAxiosRequestConfig) => {
-          if (accessToken && !config._retry) {
-            config.headers.Authorization = `Bearer ${accessToken}`;
-          }
-          return config;
-        },
-      );
-
-      const responseInterceptor = axios.interceptors.response.use(
-        (response) => {
-          return response;
-        },
-        async (error) => {
-          const originalRequest = error.config as CustomAxiosRequestConfig;
-
-          // 1. Stop infinite loop by not retrying if the endpoint is /token/refresh
-          //    or if we've already retried once (_retry).
-          if (
-            error.response?.status === 401 &&
-            !originalRequest._retry &&
-            !originalRequest.url?.includes("/token/refresh")
-          ) {
-            originalRequest._retry = true;
-            try {
-              // 2. Refresh only for non-refresh requests
-              const newAccessToken = await refreshAccessToken();
-              originalRequest.headers = originalRequest.headers || {};
-              originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
-              return axios(originalRequest);
-            } catch (refreshError) {
-              console.error("Failed to refresh token:", refreshError);
-              logout();
-            }
-          }
-
-          return Promise.reject(error);
-        },
-      );
-
-      return () => {
-        axios.interceptors.request.eject(requestInterceptor);
-        axios.interceptors.response.eject(responseInterceptor);
-      };
-    }
-
-    const unregisterInterceptors = registerInterceptors();
-
-    return function cleanup() {
-      unregisterInterceptors();
+    return () => {
+      axios.interceptors.request.eject(requestInterceptor);
     };
-  }, [accessToken, refreshAccessToken]);
-
-  useLayoutEffect(
-    function () {
-      const savedUser = getUserFromLocalStorage();
-
-      if (!savedUser) {
-        return;
-      }
-
-      setUser(savedUser);
-      refreshAccessToken().catch(() => {
-        clearUserData();
-      });
-    },
-    [refreshAccessToken],
-  );
+  }, [accessToken]);
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, login, logout, user }}>
-      {children}
+    <AuthContext.Provider
+      value={{ isAuthenticated, login, logout, user, accessToken, loading }}
+    >
+      {!loading && children}
     </AuthContext.Provider>
   );
 }
