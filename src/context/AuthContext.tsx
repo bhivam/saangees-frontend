@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, ReactNode } from "react";
+import React, { createContext, useState, useEffect, ReactNode, useLayoutEffect } from "react";
 import axios, { InternalAxiosRequestConfig } from "axios";
 import { baseUrl } from "../default";
 
@@ -23,7 +23,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true); // Added loading state
+  const [loading, setLoading] = useState(true);
 
   function saveAuthData(token: string, user: User): void {
     localStorage.setItem("authData", JSON.stringify({ token, user }));
@@ -67,21 +67,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearAuthData();
   }
 
-  useEffect(() => {
-    const authData = loadAuthData();
-    if (authData) {
-      setAccessToken(authData.token);
-      setUser(authData.user);
-      setIsAuthenticated(true);
-    }
-    setLoading(false); // Mark loading complete after checking auth data
-  }, []);
-
-  useEffect(() => {
+  function loadAuthInterceptor(token: string) {
     const requestInterceptor = axios.interceptors.request.use(
       (config: InternalAxiosRequestConfig) => {
         if (accessToken) {
-          config.headers.Authorization = `Bearer ${accessToken}`;
+          config.headers.Authorization = `Bearer ${token}`;
         }
         return config;
       },
@@ -90,6 +80,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       axios.interceptors.request.eject(requestInterceptor);
     };
+  }
+
+  useEffect(() => {
+    const authData = loadAuthData();
+    if (authData) {
+      setAccessToken(authData.token);
+      setUser(authData.user);
+      setIsAuthenticated(true);
+    }
+    setLoading(false);
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!accessToken) {
+      return;
+    }
+    return loadAuthInterceptor(accessToken);
   }, [accessToken]);
 
   return (

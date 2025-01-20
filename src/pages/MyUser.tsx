@@ -8,7 +8,7 @@ export default function User() {
   useEffect(() => {
     async function fetchUser() {
       try {
-        const response = await axios.get(baseUrl("/user"));
+        const response = await axios.get(baseUrl("/user"), {});
         console.log(response.data);
         setUser(response.data);
       } catch (error) {

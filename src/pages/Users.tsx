@@ -8,7 +8,7 @@ export default function Users() {
   useEffect(() => {
     async function fetchUsers() {
       try {
-        const response = await axios.get(baseUrl("/user/list"));
+        const response = await axios.get(baseUrl("/user/list"), {});
         setUsers(response.data);
       } catch (error) {
         console.error("Error fetching users:", error);
