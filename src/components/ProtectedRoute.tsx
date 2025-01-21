@@ -3,28 +3,27 @@ import { Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 interface ProtectedRouteProps {
-  children: React.ReactElement;
-  requiredRole?: "admin";
+  element: React.ReactElement;
+  role: "admin" | "user";
 }
 
-function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
+export default function PR({ element, role }: ProtectedRouteProps) {
   const { isAuthenticated, user, loading } = useAuth();
+  let node = element;
 
   if (loading) {
-    return <div>Loading...</div>; // Display a loading indicator while authentication state is being determined
+    node = <div>Loading...</div>;
   }
 
   if (!isAuthenticated) {
     console.log("User is not authenticated.");
-    return <Navigate to="/auth" />;
+    node = <Navigate to="/auth" />;
   }
 
-  if (requiredRole && !user?.is_admin) {
+  if (role === "admin" && !user?.is_admin) {
     console.log("User does not have the required admin role.", user);
-    return <Navigate to="/unauthorized" />;
+    node = <Navigate to="/unauthorized" />;
   }
 
-  return children;
+  return node;
 }
-
-export default ProtectedRoute;

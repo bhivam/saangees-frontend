@@ -1,4 +1,10 @@
-import React, { createContext, useState, useEffect, ReactNode, useLayoutEffect } from "react";
+import React, {
+  createContext,
+  useState,
+  useEffect,
+  ReactNode,
+  useLayoutEffect,
+} from "react";
 import axios, { InternalAxiosRequestConfig } from "axios";
 import { baseUrl } from "../default";
 
@@ -46,7 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const response = await axios.post(
         baseUrl("/token"),
-        { email: username, password },
+        { phone_number: username, password },
         { withCredentials: true },
       );
       const { token, user } = response.data;
@@ -82,6 +88,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }
 
+  function loadLogoutInterceptor() {
+    const responseInterceptor = axios.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response?.status === 401 || error.response?.status === 403) {
+          clearAuthData();
+        }
+        return Promise.reject(error);
+      },
+    );
+
+    return () => {
+      axios.interceptors.response.eject(responseInterceptor);
+    };
+  }
+
   useEffect(() => {
     const authData = loadAuthData();
     if (authData) {
@@ -90,6 +112,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsAuthenticated(true);
     }
     setLoading(false);
+  }, []);
+
+  useLayoutEffect(() => {
+    return loadLogoutInterceptor();
   }, []);
 
   useLayoutEffect(() => {
