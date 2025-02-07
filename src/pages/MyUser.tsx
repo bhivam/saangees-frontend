@@ -1,8 +1,10 @@
 import axios from "axios";
 import { useEffect, useState } from "react";
 import { baseUrl } from "../default";
+import { useAuth } from "../context/AuthContext";
 
 export default function User() {
+  const { logout } = useAuth();
   const [user, setUser] = useState([]);
 
   useEffect(() => {
@@ -26,6 +28,12 @@ export default function User() {
         </h2>
         <p className="text-black">{JSON.stringify(user)}</p>
       </div>
+      <button
+        onClick={logout}
+        className="mt-4 bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
+      >
+        logout
+      </button>
     </div>
   );
 }

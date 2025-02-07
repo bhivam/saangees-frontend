@@ -10,7 +10,7 @@ import { baseUrl } from "../default";
 
 interface User {
   name: string;
-  email: string;
+  phone_number: string;
   is_admin: boolean;
 }
 
@@ -19,7 +19,6 @@ interface AuthContextType {
   login(username: string, password: string): Promise<void>;
   logout(): void;
   user: User | null;
-  accessToken: string | null;
   loading: boolean;
 }
 
@@ -27,12 +26,11 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  function saveAuthData(token: string, user: User): void {
-    localStorage.setItem("authData", JSON.stringify({ token, user }));
+  function saveAuthData(user: User): void {
+    localStorage.setItem("authData", JSON.stringify({ user }));
   }
 
   function loadAuthData(): { token: string; user: User } | null {
@@ -41,8 +39,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   function clearAuthData(): void {
+    // TODO call to logout endpoint to remove http only token
     localStorage.removeItem("authData");
-    setAccessToken(null);
     setUser(null);
     setIsAuthenticated(false);
     setLoading(false);
@@ -55,13 +53,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         { phone_number: username, password },
         { withCredentials: true },
       );
-      const { token, user } = response.data;
+      const user = response.data;
 
-      setAccessToken(token.token);
       setUser(user);
       setIsAuthenticated(true);
       setLoading(false);
-      saveAuthData(token.token, user);
+      saveAuthData(user);
     } catch (error) {
       console.error("Login failed:", error);
       setLoading(false);
@@ -70,15 +67,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   function logout(): void {
+    axios.delete(baseUrl("/token"), { withCredentials: true });
     clearAuthData();
   }
 
-  function loadAuthInterceptor(token: string) {
+  function loadAuthInterceptor() {
     const requestInterceptor = axios.interceptors.request.use(
       (config: InternalAxiosRequestConfig) => {
-        if (accessToken) {
-          config.headers.Authorization = `Bearer ${token}`;
-        }
+        // config.headers.Authorization = `Bearer ${token}`;
+        config.withCredentials = true;
         return config;
       },
     );
@@ -107,7 +104,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const authData = loadAuthData();
     if (authData) {
-      setAccessToken(authData.token);
       setUser(authData.user);
       setIsAuthenticated(true);
     }
@@ -119,15 +115,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useLayoutEffect(() => {
-    if (!accessToken) {
-      return;
-    }
-    return loadAuthInterceptor(accessToken);
-  }, [accessToken]);
+    return loadAuthInterceptor();
+  }, [isAuthenticated]);
 
   return (
     <AuthContext.Provider
-      value={{ isAuthenticated, login, logout, user, accessToken, loading }}
+      value={{ isAuthenticated, login, logout, user, loading }}
     >
       {!loading && children}
     </AuthContext.Provider>
