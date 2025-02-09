@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
-import { ShoppingCart, LogOut } from "lucide-react";
+import { ShoppingCart, LogOut, LucideShoppingBag } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 export default function Nav() {
@@ -33,6 +33,9 @@ export default function Nav() {
 
             {isAuthenticated && !user?.is_admin && (
               <>
+                <Button variant="ghost" size="sm" className="text-gray-600">
+                  <LucideShoppingBag className="h-5 w-5" />
+                </Button>
                 <Button variant="ghost" size="sm" className="text-gray-600">
                   <ShoppingCart className="h-5 w-5" />
                 </Button>

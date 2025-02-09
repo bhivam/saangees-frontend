@@ -39,10 +39,10 @@ export default function Auth() {
   const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
-  // Redirect to /user if already authenticated
+  // Redirect to / if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
-      navigate("/user");
+      navigate("/");
     }
   }, [isAuthenticated, navigate]);
 
@@ -51,7 +51,7 @@ export default function Auth() {
     try {
       await login(phoneNumber.replace(/\D/g, ""), password);
       if (isAuthenticated) {
-        navigate("/user");
+        navigate("/");
       }
     } catch (err) {
       console.error("Login failed:", err);
@@ -70,7 +70,7 @@ export default function Auth() {
       if (response.status === 201) {
         await login(phoneNumber.replace(/\D/g, ""), password);
         if (isAuthenticated) {
-          navigate("/user");
+          navigate("/");
         }
       } else {
         console.error("Sign-up failed:", response.data);

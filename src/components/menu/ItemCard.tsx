@@ -16,8 +16,7 @@ interface ItemCardProps {
 }
 
 export default function ItemCard({ item }: ItemCardProps) {
-  const { isAuthenticated, user } = useAuth();
-  const [selectedSize, setSelectedSize] = useState(item.size_options[0]?.name);
+  const { isAuthenticated } = useAuth();
   const [selectedSpice, setSelectedSpice] = useState(
     item.spice_options[0]?.name,
   );
@@ -27,10 +26,7 @@ export default function ItemCard({ item }: ItemCardProps) {
   };
 
   const getPrice = () => {
-    const sizeOption = item.size_options.find(
-      (opt) => opt.name === selectedSize,
-    );
-    return (item.base_price + (sizeOption?.price_modifier || 0)).toFixed(2);
+    return item.base_price.toFixed(2);
   };
 
   return (
@@ -47,29 +43,9 @@ export default function ItemCard({ item }: ItemCardProps) {
             </span>
           </div>
 
-          {isAuthenticated && !user?.is_admin && (
+          {isAuthenticated && (
             <div className="space-y-4">
               <div className="flex gap-4">
-                <div className="flex-1">
-                  <label className="text-sm text-gray-600 mb-1 block">
-                    Size
-                  </label>
-                  <Select value={selectedSize} onValueChange={setSelectedSize}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {item.size_options.map((size) => (
-                        <SelectItem key={size.name} value={size.name}>
-                          {size.name}{" "}
-                          {size.price_modifier > 0 &&
-                            `(+$${size.price_modifier})`}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
                 <div className="flex-1">
                   <label className="text-sm text-gray-600 mb-1 block">
                     Spice Level
