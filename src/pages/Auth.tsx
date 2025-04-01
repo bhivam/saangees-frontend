@@ -3,72 +3,113 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { baseUrl } from "../default";
 import axios from "axios";
+import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 
-function PhoneNumberInput({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  function handleInput(e: React.ChangeEvent<HTMLInputElement>) {
-    const formatted = e.target.value
-      .replace(/[^0-9]/g, "")
-      .replace(/(\d{3})(\d{3})(\d{4})/, "($1) $2-$3")
-      .slice(0, 14);
-    onChange(formatted);
-  }
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
 
-  return (
-    <input
-      type="tel"
-      className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-[#6CD0D0] focus:border-[#6CD0D0]"
-      placeholder="(123) 456-7890"
-      value={value}
-      onChange={handleInput}
-    />
-  );
-}
+const loginForm = z.object({
+  phoneNumber: z
+    .string()
+    .nonempty()
+    .regex(/^[0-9]{10}$/, "Phone number needs exactly 10 digits."),
+  password: z
+    .string()
+    .nonempty()
+    .regex(/.{4,}/, "Password needs at least 4 characters."),
+});
+
+const signupForm = z.object({
+  phoneNumber: z
+    .string()
+    .nonempty()
+    .regex(/^[0-9]{10}$/, "Phone number needs exactly 10 digits."),
+  password: z
+    .string()
+    .nonempty()
+    .regex(/.{4,}/, "Password needs at least 4 characters."),
+  firstName: z
+    .string()
+    .nonempty()
+    .regex(/^[^ ]+/, "Invalid first name."),
+  lastName: z
+    .string()
+    .nonempty()
+    .regex(/^[^ ]+/, "Invalid last name."),
+});
+
+type LoginFormValues = z.infer<typeof loginForm>;
+type SignupFormValues = z.infer<typeof signupForm>;
+
+const formatPhoneNumber = (value: string) => {
+  const digits = value.replace(/\D/g, "");
+  if (digits.length === 0) return "";
+  if (digits.length <= 3) return `(${digits}`;
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
+};
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
-  const [name, setName] = useState("");
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [password, setPassword] = useState("");
-
   const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
-  // Redirect to / if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
       navigate("/");
     }
   }, [isAuthenticated, navigate]);
 
-  async function handleLogin(e: React.FormEvent) {
-    e.preventDefault();
+  const loginFormHook = useForm<LoginFormValues>({
+    resolver: zodResolver(loginForm),
+    defaultValues: {
+      phoneNumber: "",
+      password: "",
+    },
+  });
+
+  const signupFormHook = useForm<SignupFormValues>({
+    resolver: zodResolver(signupForm),
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      phoneNumber: "",
+      password: "",
+    },
+  });
+
+  const onLoginSubmit = async (data: LoginFormValues) => {
     try {
-      await login(phoneNumber.replace(/\D/g, ""), password);
+      await login(data.phoneNumber, data.password);
       if (isAuthenticated) {
         navigate("/");
       }
     } catch (err) {
       console.error("Login failed:", err);
     }
-  }
+  };
 
-  async function handleSignUp(e: React.FormEvent) {
-    e.preventDefault();
+  const onSignupSubmit = async (data: SignupFormValues) => {
     try {
       const response = await axios.post(baseUrl("/user/create"), {
-        name,
-        phone_number: phoneNumber.replace(/\D/g, ""),
-        password,
+        name: `${data.firstName} ${data.lastName}`,
+        phone_number: data.phoneNumber,
+        password: data.password,
       });
 
       if (response.status === 201) {
-        await login(phoneNumber.replace(/\D/g, ""), password);
+        await login(data.phoneNumber.replace(/\D/g, ""), data.password);
         if (isAuthenticated) {
           navigate("/");
         }
@@ -78,80 +119,176 @@ export default function Auth() {
     } catch (err) {
       console.error("Sign-up failed:", err);
     }
-  }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="w-full max-w-md bg-white shadow-lg rounded-lg p-6">
-        <h1 className="text-2xl font-bold text-gray-800 text-center mb-6">
-          {isLogin ? "Login" : "Sign Up"}
-        </h1>
-
-        <form className="space-y-4">
-          {!isLogin && (
-            <div>
-              <label
-                htmlFor="name"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Full Name
-              </label>
-              <input
-                id="name"
-                type="text"
-                className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-[#6CD0D0] focus:border-[#6CD0D0]"
-                placeholder="John Doe"
-                onChange={(e) => setName(e.target.value)}
-              />
-            </div>
-          )}
-
-          <div>
-            <label
-              htmlFor="phone"
-              className="block text-sm font-medium text-gray-700"
-            >
-              Phone Number
-            </label>
-            <PhoneNumberInput value={phoneNumber} onChange={setPhoneNumber} />
-          </div>
-
-          <div>
-            <label
-              htmlFor="password"
-              className="block text-sm font-medium text-gray-700"
-            >
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-[#6CD0D0] focus:border-[#6CD0D0]"
-              placeholder="••••••••"
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
-
-          <button
-            type="submit"
-            className="w-full px-4 py-2 bg-[#F98128] text-white font-bold rounded-lg hover:bg-[#D96F20] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#F98128]"
-            onClick={isLogin ? handleLogin : handleSignUp}
-          >
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle className="text-2xl font-bold text-gray-800 text-center">
             {isLogin ? "Login" : "Sign Up"}
-          </button>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLogin ? (
+            <Form {...loginFormHook}>
+              <form
+                onSubmit={loginFormHook.handleSubmit(onLoginSubmit)}
+                className="space-y-4"
+              >
+                <FormField
+                  control={loginFormHook.control}
+                  name="phoneNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone Number</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          type="tel"
+                          placeholder="(123) 456-7890"
+                          value={formatPhoneNumber(field.value)}
+                          className="focus:ring-[#6CD0D0] focus:border-[#6CD0D0]"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={loginFormHook.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Password</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="password"
+                          placeholder="••••••••"
+                          {...field}
+                          className="focus:ring-[#6CD0D0] focus:border-[#6CD0D0]"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <Button
+                  type="submit"
+                  className="w-full bg-[#F98128] hover:bg-[#D96F20] focus:ring-[#F98128]"
+                >
+                  Login
+                </Button>
+              </form>
+            </Form>
+          ) : (
+            <Form {...signupFormHook}>
+              <form
+                onSubmit={signupFormHook.handleSubmit(onSignupSubmit)}
+                className="space-y-4"
+              >
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={signupFormHook.control}
+                    name="firstName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>First Name</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="John"
+                            {...field}
+                            className="focus:ring-[#6CD0D0] focus:border-[#6CD0D0]"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={signupFormHook.control}
+                    name="lastName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Last Name</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Doe"
+                            {...field}
+                            className="focus:ring-[#6CD0D0] focus:border-[#6CD0D0]"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <FormField
+                  control={signupFormHook.control}
+                  name="phoneNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone Number</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          type="tel"
+                          placeholder="(123) 456-7890"
+                          value={formatPhoneNumber(field.value)}
+                          className="focus:ring-[#6CD0D0] focus:border-[#6CD0D0]"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={signupFormHook.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Password</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="password"
+                          placeholder="••••••••"
+                          {...field}
+                          className="focus:ring-[#6CD0D0] focus:border-[#6CD0D0]"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <Button
+                  type="submit"
+                  className="w-full bg-[#F98128] hover:bg-[#D96F20] focus:ring-[#F98128]"
+                >
+                  Sign Up
+                </Button>
+              </form>
+            </Form>
+          )}
 
           <p className="text-sm text-center mt-4">
             {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
-            <button
+            <Button
               type="button"
-              className="text-[#F98128] font-bold hover:underline"
+              variant="link"
+              className="text-[#F98128] font-bold p-0"
               onClick={() => setIsLogin(!isLogin)}
             >
               {isLogin ? "Sign Up" : "Login"}
-            </button>
+            </Button>
           </p>
-        </form>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
